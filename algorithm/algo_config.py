@@ -8,5 +8,5 @@ class EnvConfig:
     EPISODES = 400
     IS_BASE = False
     # RANDOM_SEED = 100
-    RANDOM_SEED = 42
+    RANDOM_SEED = 64
     IS_SMOOTH_DATA = True

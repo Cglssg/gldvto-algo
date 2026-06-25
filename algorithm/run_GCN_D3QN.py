@@ -20,16 +20,6 @@ from torch_geometric.data import Data, Batch
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# 定义根目录和子目录
-ROOT_RESULT_DIR = "result_gcn_d3qn"
-MODEL_DIR = os.path.join(ROOT_RESULT_DIR, "model")
-PLOT_DIR = os.path.join(ROOT_RESULT_DIR, "plt")
-
-# 确保目录存在
-os.makedirs(MODEL_DIR, exist_ok=True)
-os.makedirs(PLOT_DIR, exist_ok=True)
-
-
 class D3QN(nn.Module):
     """GCN+D3QN网络：Dueling架构（分离价值流和优势流）"""
 
@@ -435,9 +425,5 @@ def train_gcn_d3qn(lr=4e-5, gamma=0.95, epsilon=1.0, epsilon_decay=0.9, episodes
         rewards_history.append(total_reward)
         # 保存每轮总损失值
         losses_history.append(np.sum(episode_losses))
-
-    # 模型保存
-    model_path = os.path.join(MODEL_DIR, f"gcn_d3qn_lr{lr}_gamma{gamma}_decay{epsilon_decay}.pth")
-    agent.save_model(model_path)
 
     return rewards_history, env.metrics_episodes, (lr, gamma, epsilon_decay)

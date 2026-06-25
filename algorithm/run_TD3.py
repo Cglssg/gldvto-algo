@@ -8,7 +8,6 @@ import torch.nn.functional as F
 from collections import deque
 import matplotlib
 from tqdm import tqdm
-
 matplotlib.use('TkAgg')
 from env import *
 import os
@@ -17,18 +16,6 @@ import numpy as np
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-# 定义根目录和子目录
-ROOT_RESULT_DIR = "result_td3"
-MODEL_DIR = os.path.join(ROOT_RESULT_DIR, "model")
-PLOT_DIR = os.path.join(ROOT_RESULT_DIR, "plt")
-METRICS_PLOT_DIR = os.path.join(PLOT_DIR, "metrics_9grid")
-
-# 确保目录存在
-os.makedirs(MODEL_DIR, exist_ok=True)
-os.makedirs(PLOT_DIR, exist_ok=True)
-os.makedirs(METRICS_PLOT_DIR, exist_ok=True)
-
 
 # ========== TD3 核心网络定义 ==========
 class Actor(nn.Module):
@@ -547,9 +534,5 @@ def train_td3(lr=1e-5, gamma=0.8, tau=0.005, policy_noise=0.5, episodes_num=EnvC
 
         # 重置环境
         env.reset()
-
-    # 保存模型
-    model_path = os.path.join(MODEL_DIR, f"td3_lr{lr}_gamma{gamma}_tau{tau}_noise{policy_noise}.pth")
-    agent.save_model(model_path)
 
     return rewards_history, env.metrics_episodes, (lr, gamma, tau, policy_noise)

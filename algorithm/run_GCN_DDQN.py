@@ -8,7 +8,6 @@ import torch.nn.functional as F
 from collections import deque
 import matplotlib
 from tqdm import tqdm
-
 matplotlib.use('TkAgg')
 from env import *
 import os
@@ -20,17 +19,6 @@ from torch_geometric.data import Data, Batch
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-# 定义根目录和子目录
-ROOT_RESULT_DIR = "result_gcn_ddqn"
-MODEL_DIR = os.path.join(ROOT_RESULT_DIR, "model")
-PLOT_DIR = os.path.join(ROOT_RESULT_DIR, "plt")
-METRICS_PLOT_DIR = os.path.join(PLOT_DIR, "metrics_9grid")
-
-# 确保目录存在
-os.makedirs(MODEL_DIR, exist_ok=True)
-os.makedirs(PLOT_DIR, exist_ok=True)
-os.makedirs(METRICS_PLOT_DIR, exist_ok=True)  # 创建九宫格目录
 
 class DDQN(nn.Module):
     """GCN+DDQN网络：使用图卷积提取拓扑特征"""
@@ -474,9 +462,5 @@ def train_gcn_ddqn(lr=4e-5, gamma=0.95, epsilon=1.0, epsilon_decay=0.9, episodes
         losses_history.append(np.sum(episode_losses))
 
         env.reset()
-
-    # 模型保存
-    model_path = os.path.join(MODEL_DIR, f"gcn_ddqn_lr{lr}_gamma{gamma}_decay{epsilon_decay}.pth")
-    agent.save_model(model_path)
 
     return rewards_history, env.metrics_episodes, (lr, gamma, epsilon_decay)

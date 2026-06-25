@@ -33,11 +33,7 @@ class ComputeLocation(Enum):
     EDGE = "边缘计算"
     CLOUD = "云端计算"
 
-
-
-
 class Position:
-    """位置类，处理经纬度和道路坐标"""
 
     def __init__(self, latitude: float = 0.0, longitude: float = 0.0, road_id: str = ""):
         self.latitude = latitude
@@ -45,7 +41,6 @@ class Position:
         self.road_id = road_id
 
     def distance_to(self, other: 'Position') -> float:
-        """计算两个位置之间的欧氏距离（简化版）"""
         lat_diff = self.latitude - other.latitude
         lon_diff = self.longitude - other.longitude
         return math.sqrt(lat_diff ** 2 + lon_diff ** 2)

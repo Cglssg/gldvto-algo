@@ -16,20 +16,9 @@ matplotlib.use('TkAgg')
 from algo_config import EnvConfig
 from env import Simulator
 
-# ===================== 全局配置 =====================
-ROOT_RESULT_DIR = "result_gat_lstm_ddqn"
-MODEL_DIR = os.path.join(ROOT_RESULT_DIR, "model")
-PLOT_DIR = os.path.join(ROOT_RESULT_DIR, "plt")
-METRICS_PLOT_DIR = os.path.join(PLOT_DIR, "metrics_9grid")
-
-os.makedirs(MODEL_DIR, exist_ok=True)
-os.makedirs(PLOT_DIR, exist_ok=True)
-os.makedirs(METRICS_PLOT_DIR, exist_ok=True)
-
 # 日志配置
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
 
 # ===================== 网络定义 =====================
 class DDQN(nn.Module):
@@ -421,9 +410,5 @@ def train_gat_lstm_ddqn(lr=2e-5, gamma=0.95, epsilon=1.0, epsilon_decay=0.997, e
         # 记录每回合奖励和损失
         rewards.append(total_r)
         losses.append(np.sum(ep_loss) if ep_loss else 0)
-
-    # 保存模型
-    model_path = os.path.join(MODEL_DIR, f"gat_lstm_ddqn_lr{lr}_g{gamma}_decay{epsilon_decay}.pth")
-    agent.save_model(model_path)
 
     return rewards, env.metrics_episodes, (lr, gamma, epsilon_decay)

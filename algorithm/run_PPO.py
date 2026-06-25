@@ -17,17 +17,6 @@ import numpy as np
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# 定义根目录和子目录
-ROOT_RESULT_DIR = "result_ppo"
-MODEL_DIR = os.path.join(ROOT_RESULT_DIR, "model")
-PLOT_DIR = os.path.join(ROOT_RESULT_DIR, "plt")
-METRICS_PLOT_DIR = os.path.join(PLOT_DIR, "metrics_9grid")
-
-# 确保目录存在
-os.makedirs(MODEL_DIR, exist_ok=True)
-os.makedirs(PLOT_DIR, exist_ok=True)
-os.makedirs(METRICS_PLOT_DIR, exist_ok=True)
-
 # PPO经验存储结构
 PPOTransition = namedtuple('PPOTransition',
                            ['state', 'action', 'log_prob', 'reward', 'next_state', 'done', 'value'])
@@ -461,9 +450,5 @@ def train_ppo(lr_actor=5e-5, lr_critic=1e-5, gamma=0.95,
             actor_loss_history.append(np.mean(list(agent.actor_losses)[-100:]))
         if agent.critic_losses:
             critic_loss_history.append(np.mean(list(agent.critic_losses)[-100:]))
-
-    # 保存模型
-    model_path = os.path.join(MODEL_DIR, f"ppo_lra{lr_actor}_lrc{lr_critic}_gamma{gamma}.pth")
-    agent.save_model(model_path)
 
     return rewards_history, env.metrics_episodes, (lr_actor, lr_critic, gamma)

@@ -8,28 +8,15 @@ import torch.nn.functional as F
 from collections import deque
 import matplotlib
 from tqdm import tqdm
-
 matplotlib.use('TkAgg')
 from env import *
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 import random
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-# 定义根目录和子目录
-ROOT_RESULT_DIR = "result_ddpg"
-MODEL_DIR = os.path.join(ROOT_RESULT_DIR, "model")
-PLOT_DIR = os.path.join(ROOT_RESULT_DIR, "plt")
-METRICS_PLOT_DIR = os.path.join(PLOT_DIR, "metrics_9grid")
-
-# 确保目录存在
-os.makedirs(MODEL_DIR, exist_ok=True)
-os.makedirs(PLOT_DIR, exist_ok=True)
-os.makedirs(METRICS_PLOT_DIR, exist_ok=True)  # 创建九宫格目录
 
 # OU噪声生成器（DDPG探索策略）
 class OUNoise:
@@ -530,10 +517,6 @@ def train_ddpg(lr_actor=1e-6, lr_critic=5e-3, gamma=0.9, tau=0.01, episodes_num=
         rewards_history.append(total_reward)
         actor_losses_history.append(np.mean(episode_actor_losses))
         critic_losses_history.append(np.mean(episode_critic_losses))
-
-    # 保存模型和结果
-    model_path = os.path.join(MODEL_DIR, f"ddpg_lra{lr_actor}_lrc{lr_critic}_gamma{gamma}_tau{tau}.pth")
-    agent.save_model(model_path)
 
     return rewards_history, env.metrics_episodes, (
     lr_actor, lr_critic, gamma, tau)

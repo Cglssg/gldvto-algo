@@ -3,7 +3,6 @@ import logging
 import os
 import random
 from collections import deque
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -15,16 +14,6 @@ import matplotlib
 matplotlib.use('TkAgg')
 from algo_config import EnvConfig
 from env import Simulator
-
-# ===================== 全局配置 =====================
-ROOT_RESULT_DIR = "result_gat_lstm_d3qn"
-MODEL_DIR = os.path.join(ROOT_RESULT_DIR, "model")
-PLOT_DIR = os.path.join(ROOT_RESULT_DIR, "plt")
-METRICS_PLOT_DIR = os.path.join(PLOT_DIR, "metrics_9grid")
-
-os.makedirs(MODEL_DIR, exist_ok=True)
-os.makedirs(PLOT_DIR, exist_ok=True)
-os.makedirs(METRICS_PLOT_DIR, exist_ok=True)
 
 # 日志配置
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -226,23 +215,6 @@ class D3QNAgent:
         if self.train_step % self.target_update == 0:
             self.target_net.load_state_dict(self.policy_net.state_dict())
 
-    def save_model(self, path):
-        torch.save({
-            "policy": self.policy_net.state_dict(),
-            "target": self.target_net.state_dict(),
-            "optim": self.optimizer.state_dict(),
-            "epsilon": self.epsilon
-        }, path)
-        logger.info(f"模型已保存: {path}")
-
-    def load_model(self, path):
-        ckpt = torch.load(path, map_location=self.device)
-        self.policy_net.load_state_dict(ckpt["policy"])
-        self.target_net.load_state_dict(ckpt["target"])
-        self.optimizer.load_state_dict(ckpt["optim"])
-        self.epsilon = ckpt["epsilon"]
-        logger.info(f"模型已加载: {path}")
-
     def reset(self):
         self.losses.clear()
         self.ts_buffer = deque([torch.zeros(self.node_feature_dim) for _ in range(self.time_steps)],
@@ -419,8 +391,5 @@ def train_gat_lstm_d3qn(lr=5e-5, gamma=0.9,epsilon=1.0, epsilon_decay=0.995, epi
 
         rewards.append(total_r)
         losses.append(np.sum(ep_loss) if ep_loss else 0)
-
-    model_path = os.path.join(MODEL_DIR, f"gat_lstm_d3qn_lr{lr}_g{gamma}_decay{epsilon_decay}.pth")
-    agent.save_model(model_path)
 
     return rewards, env.metrics_episodes, (lr, gamma, epsilon_decay)
