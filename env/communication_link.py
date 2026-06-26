@@ -2,7 +2,7 @@ from .utils_class import LinkStatus, CommunicationType
 import random
 from .base_station import BaseStation
 from .edge_server import EdgeServer
-from typing import List, Dict, Optional, Tuple
+from typing import Tuple
 
 class CommunicationLink:
     def __init__(self, link_id: str, base_station: BaseStation, edge_server: EdgeServer):

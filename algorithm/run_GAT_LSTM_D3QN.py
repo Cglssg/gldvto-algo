@@ -15,12 +15,10 @@ matplotlib.use('TkAgg')
 from algo_config import EnvConfig
 from env import Simulator
 
-# 日志配置
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
-# ===================== 网络定义 =====================
 class D3QN(nn.Module):
     def __init__(self, node_feature_dim, edge_feature_dim, hidden_dim=128, action_dim=3,
                  lstm_hidden_dim=64, lstm_layers=2, time_steps=5):
@@ -33,12 +31,10 @@ class D3QN(nn.Module):
         self.lstm_layers = lstm_layers
         self.time_steps = time_steps
 
-        # GAT 层
         self.conv1 = pyg_nn.GATConv(node_feature_dim, hidden_dim, heads=4, concat=True)
         self.conv2 = pyg_nn.GATConv(hidden_dim * 4, hidden_dim, heads=2, concat=True)
         self.conv3 = pyg_nn.GATConv(hidden_dim * 2, hidden_dim // 2, heads=1, concat=False)
 
-        # LSTM
         self.lstm = nn.LSTM(
             input_size=8,
             hidden_size=lstm_hidden_dim,
@@ -47,7 +43,6 @@ class D3QN(nn.Module):
             dropout=0.1 if lstm_layers > 1 else 0
         )
 
-        # Dueling DQN 结构
         self.fc_shared = nn.Linear(lstm_hidden_dim, hidden_dim)
         self.fc_val = nn.Linear(hidden_dim, hidden_dim // 2)
         self.fc_adv = nn.Linear(hidden_dim, hidden_dim // 2)
@@ -59,7 +54,6 @@ class D3QN(nn.Module):
         self.layer_norm = nn.LayerNorm(hidden_dim // 2)
 
     def forward(self, data, time_series_features):
-        # GAT 空间特征
         x, edge_index = data.x, data.edge_index
         x = self.relu(self.conv1(x, edge_index))
         x = self.dropout(x)
@@ -71,12 +65,10 @@ class D3QN(nn.Module):
         batch = data.batch if hasattr(data, 'batch') else torch.zeros(x.size(0), dtype=torch.long, device=x.device)
         x_pool = pyg_nn.global_mean_pool(x, batch)
 
-        # LSTM 时序特征
         ts = time_series_features.to(x.device)
         lstm_out, _ = self.lstm(ts)
         lstm_feat = lstm_out[:, -1, :]
 
-        # Dueling 前向
         feat = self.relu(self.fc_shared(lstm_feat))
         feat = self.dropout(feat)
 
@@ -86,14 +78,10 @@ class D3QN(nn.Module):
         adv = self.relu(self.fc_adv(feat))
         adv = self.adv_out(adv)
 
-        # 聚合 Q 值
-        # q = val + (adv - adv.mean(dim=1, keepdim=True))
-
         mean_adv = torch.mean(adv, dim=1, keepdim=True) * 1.6
         q = val + (adv - mean_adv)
         return q
 
-# ===================== Agent =====================
 class D3QNAgent:
     def __init__(self, node_feature_dim, edge_feature_dim, action_dim=3,
                  learning_rate=1e-5, gamma=0.9, epsilon=1.0,
@@ -111,7 +99,6 @@ class D3QNAgent:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logger.info(f"使用设备: {self.device}")
 
-        # 双网络
         self.policy_net = D3QN(node_feature_dim, edge_feature_dim, action_dim=action_dim).to(self.device)
         self.target_net = D3QN(node_feature_dim, edge_feature_dim, action_dim=action_dim).to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
@@ -119,24 +106,19 @@ class D3QNAgent:
 
         self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=learning_rate, weight_decay=1e-5)
 
-        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-        # 拆分三组参数：V分支参数、Adv分支参数、GAT+LSTM共享参数
         value_params = []
         other_params = []
 
         for name, param in self.policy_net.named_parameters():
-            # 所有value_branch下的层归为V参数
             if "value_branch" in name:
                 value_params.append(param)
             else:
                 other_params.append(param)
 
-        # 分组优化：V分支大weight_decay=1e-3，其余正常1e-5
         opt_groups = [
-            {"params": value_params, "weight_decay": 1e-3},  # V加大衰减，压制V暴涨
+            {"params": value_params, "weight_decay": 1e-3},
             {"params": other_params, "weight_decay": 1e-5}
         ]
-        # self.optimizer = torch.optim.Adam(opt_groups, lr=learning_rate)
 
         self.memory = deque(maxlen=20000)
         self.batch_size = 64
@@ -144,7 +126,6 @@ class D3QNAgent:
         self.target_update = 50
         self.losses = deque(maxlen=10000)
 
-        # 时序缓冲
         self.ts_buffer = deque([torch.zeros(node_feature_dim) for _ in range(time_steps)], maxlen=time_steps)
 
     def get_ts_feat(self):
@@ -184,15 +165,12 @@ class D3QNAgent:
         ts1 = torch.cat(ts1s).to(self.device)
         ts2 = torch.cat(ts2s).to(self.device)
 
-        # ✅ 修复：LongTensor / FloatTensor / BoolTensor 首字母大写
         acts = torch.LongTensor(acts).to(self.device)
         rews = torch.FloatTensor(rews).to(self.device)
         dones = torch.BoolTensor(dones).to(self.device)
 
-        # 当前 Q
         q_cur = self.policy_net(b1, ts1).gather(1, acts.unsqueeze(1)).squeeze()
 
-        # Double DQN + Dueling
         with torch.no_grad():
             q_next_policy = self.policy_net(b2, ts2)
             best_acts = q_next_policy.argmax(1)
@@ -208,7 +186,6 @@ class D3QNAgent:
         torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
         self.optimizer.step()
 
-        # 衰减
         self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
         self.train_step += 1
 
@@ -220,8 +197,6 @@ class D3QNAgent:
         self.ts_buffer = deque([torch.zeros(self.node_feature_dim) for _ in range(self.time_steps)],
                                maxlen=self.time_steps)
 
-
-# ===================== 环境 =====================
 class GAT_LSTM_D3QNEnv:
     def __init__(self, agent=None):
         self.num_veh = EnvConfig.NUM_VEHICLES
@@ -247,7 +222,6 @@ class GAT_LSTM_D3QNEnv:
         nodes = []
         sim = self.sim
 
-        # 车辆
         for v in sim.vehicles:
             cpu = v.cpu_usage / v.cpu_capacity if v.cpu_capacity > 0 else 0
             mem = v.memory_usage / v.memory_capacity if v.memory_capacity > 0 else 0
@@ -257,7 +231,6 @@ class GAT_LSTM_D3QNEnv:
             bat = v.battery / 100.0 if hasattr(v, "battery") else 1.0
             nodes.append([px, py, cpu, mem, task, bat, 1.0, 1.0])
 
-        # 基站
         for bs in sim.base_stations:
             bw = bs.bandwidth / 5000.0
             conn = len(bs.connected_vehicles) / self.num_veh
@@ -265,7 +238,6 @@ class GAT_LSTM_D3QNEnv:
             py = bs.position[1] / 12.0
             nodes.append([px, py, bw, conn, 0, 0, 0, 0])
 
-        # 边缘
         for es in sim.edge_servers:
             cpu = es.cpu_usage / es.cpu_capacity if es.cpu_capacity > 0 else 0
             mem = es.memory_usage / es.memory_capacity if es.memory_capacity > 0 else 0
@@ -275,18 +247,15 @@ class GAT_LSTM_D3QNEnv:
             py = es.position[1] / 12.0 if hasattr(es, "position") else 0
             nodes.append([px, py, cpu, mem, load, eng, 0, 0])
 
-        # 云端
         cloud = sim.cloud_server
         cap = cloud.compute_capacity / 1000.0
         delay = cloud.communication_delay / 0.1
         eng = cloud.energy_consumption / 1000.0
         nodes.append([0.5, 0.5, cap, delay, eng, 0, 0, 0])
 
-        # 边
         edge_idx = [[], []]
         edge_attr = []
 
-        # 车-基站
         vi = 0
         for v in sim.vehicles:
             bsi = self.num_veh
@@ -303,7 +272,6 @@ class GAT_LSTM_D3QNEnv:
                 bsi += 1
             vi += 1
 
-        # 基站-边缘
         bsi = self.num_veh
         for bs in sim.base_stations:
             esi = self.num_veh + self.num_bs
@@ -335,28 +303,19 @@ class GAT_LSTM_D3QNEnv:
         return g, ts, r, done
 
     def calc_reward(self, success, rtt, delay_constraint, energy, task_priority=1):
-        """优化奖励函数（增加约束）"""
-        task_priority = max(1, min(5, task_priority))  # 限制优先级范围
+        task_priority = max(1, min(5, task_priority))
         if not success:
             return -5 * task_priority
 
-        # 基础奖励
         base_reward = 10 * task_priority
-        # 延迟惩罚（限制最大惩罚）
         delay_penalty = max(0, min((rtt - delay_constraint) * task_priority, 10 * task_priority))
-        # 延迟奖励（限制最大奖励）
         delay_reward = max(0, min((delay_constraint - rtt) * 0.5 * task_priority, 5 * task_priority))
-        # 能耗惩罚（限制最大惩罚）
         energy_cost = min(energy * 0.1 / task_priority, 5 * task_priority)
 
         reward = base_reward + delay_reward - delay_penalty - energy_cost
         return reward
-        # return max(reward, -5 * task_priority)  # 限制最小奖励
 
-
-# ===================== 训练函数 =====================
 def train_gat_lstm_d3qn(lr=5e-5, gamma=0.9,epsilon=1.0, epsilon_decay=0.995, episodes_num=EnvConfig.EPISODES):
-    # 固定随机种子
     random.seed(EnvConfig.RANDOM_SEED)
     np.random.seed(EnvConfig.RANDOM_SEED)
     torch.manual_seed(EnvConfig.RANDOM_SEED)
@@ -370,9 +329,9 @@ def train_gat_lstm_d3qn(lr=5e-5, gamma=0.9,epsilon=1.0, epsilon_decay=0.995, epi
     rewards = []
     losses = []
 
-    logger.info(f"开始训练 GAT-LSTM-D3QN | lr={lr} gamma={gamma}")
+    logger.info(f"Start training GAT-LSTM-D3QN | lr={lr} gamma={gamma}")
 
-    for ep in tqdm(range(episodes_num), desc="训练回合"):
+    for ep in tqdm(range(episodes_num), desc="Training"):
         g = env.reset()
         total_r = 0
         done = False

@@ -54,7 +54,8 @@ This simulation platform draws inspiration from EdgeSimPy, a mainstream general 
 
 ```latex
 @article{souza2023edgesimpy,    
-    author={Paulo S. Souza and Tiago Ferreto and Rodrigo N. Calheiros},    title={EdgeSimPy: Python-Based Modeling and Simulation of Edge Computing Resource Management Policies},    
+    author={Paulo S. Souza and Tiago Ferreto and Rodrigo N. Calheiros},    
+    title={EdgeSimPy: Python-Based Modeling and Simulation of Edge Computing Resource Management Policies},    
     journal={Future Generation Computer Systems},    
     year={2023},    
     issn={0167-739X},    

@@ -16,13 +16,10 @@ import random
 import torch_geometric.nn as pyg_nn
 from torch_geometric.data import Data, Batch
 
-# 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class DDQN(nn.Module):
-    """GCN+DDQN网络：使用图卷积提取拓扑特征"""
-
     def __init__(self, node_feature_dim, edge_feature_dim, hidden_dim=128, action_dim=3):
         super(DDQN, self).__init__()
         self.node_feature_dim = node_feature_dim
@@ -30,44 +27,28 @@ class DDQN(nn.Module):
         self.hidden_dim = hidden_dim
         self.action_dim = action_dim
 
-        # GCN层：提取图结构特征
-        self.conv1 = pyg_nn.GCNConv(node_feature_dim, hidden_dim)  # 第一层GCN
-        self.conv2 = pyg_nn.GCNConv(hidden_dim, hidden_dim)  # 第二层GCN
-        self.conv3 = pyg_nn.GCNConv(hidden_dim, hidden_dim // 2)  # 第三层GCN
+        self.conv1 = pyg_nn.GCNConv(node_feature_dim, hidden_dim)
+        self.conv2 = pyg_nn.GCNConv(hidden_dim, hidden_dim)
+        self.conv3 = pyg_nn.GCNConv(hidden_dim, hidden_dim // 2)
 
-        # 🔥 修复：去掉报错的 AttentionPooling，改用全局平均池化（兼容所有版本）
-        # self.attention = pyg_nn.AttentionPooling(hidden_dim // 2, hidden_dim // 2)
-
-        # 全连接层：映射到动作空间
         self.fc1 = nn.Linear(hidden_dim // 2, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, action_dim)
 
-        # 激活函数
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(0.1)
 
     def forward(self, data):
-        """
-        前向传播：输入为PyG的Data/Batch对象
-        :param data: 包含x(节点特征), edge_index(边特征)
-        :return: Q值
-        """
         x, edge_index = data.x, data.edge_index
 
-        # GCN特征提取
         x = self.relu(self.conv1(x, edge_index))
         x = self.dropout(x)
         x = self.relu(self.conv2(x, edge_index))
         x = self.dropout(x)
         x = self.relu(self.conv3(x, edge_index))
 
-        # x = self.norm(x)  # <--- 加这行
-
-        # 🔥 修复：使用全局平均池化（无版本问题）
         batch = data.batch if hasattr(data, 'batch') else torch.zeros(x.shape[0], dtype=torch.long, device=x.device)
-        x_pooled = pyg_nn.global_mean_pool(x, batch)  # 这行替换原来的注意力池化
+        x_pooled = pyg_nn.global_mean_pool(x, batch)
 
-        # 映射到动作空间
         x = self.relu(self.fc1(x_pooled))
         q_values = self.fc2(x)
 
@@ -75,8 +56,6 @@ class DDQN(nn.Module):
 
 
 class DDQNAgent:
-    """集成GCN的DDQN智能体"""
-
     def __init__(self, node_feature_dim, edge_feature_dim, action_dim=3,
                  learning_rate=0.00001, gamma=0.9, epsilon=1.0,
                  epsilon_min=0.01, epsilon_decay=0.99):
@@ -89,51 +68,41 @@ class DDQNAgent:
         self.epsilon_min = epsilon_min
         self.epsilon_decay = epsilon_decay
 
-        # 设备自动选择
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # 主网络和目标网络（GCN+DDQN）
         self.policy_net = DDQN(node_feature_dim, edge_feature_dim, action_dim=action_dim).to(self.device)
         self.target_net = DDQN(node_feature_dim, edge_feature_dim, action_dim=action_dim).to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
 
-        # 优化器
         self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=learning_rate, weight_decay=1e-5)
 
-        # 经验回放缓冲区
         self.memory = deque(maxlen=10000)
         self.batch_size = 64
 
-        # 训练控制
         self.train_step = 0
         self.target_update = 50
         self.losses = deque(maxlen=10000)
 
     def remember(self, graph_data, action, reward, next_graph_data, done):
-        """存储图结构经验"""
         self.memory.append((graph_data, action, reward, next_graph_data, done))
 
     def act(self, graph_data, evaluate=False):
-        """基于图特征选择动作"""
         if not evaluate and np.random.random() <= self.epsilon:
             return random.randrange(self.action_dim)
 
-        # 转换为batch格式并计算Q值
         graph_data = graph_data.to(self.device)
         with torch.no_grad():
             q_values = self.policy_net(graph_data)
         return np.argmax(q_values.cpu().numpy())
 
     def replay(self):
-        """GCN+DDQN经验回放训练"""
         if len(self.memory) < self.batch_size:
             return
 
         batch = random.sample(self.memory, self.batch_size)
         graph_datas, actions, rewards, next_graph_datas, dones = zip(*batch)
 
-        # 构建批次数据
         batch_data = Batch.from_data_list([gd.to('cpu') for gd in graph_datas]).to(self.device)
         next_batch_data = Batch.from_data_list([gd.to('cpu') for gd in next_graph_datas]).to(self.device)
 
@@ -141,42 +110,32 @@ class DDQNAgent:
         rewards = torch.FloatTensor(rewards).to(self.device)
         dones = torch.BoolTensor(dones).to(self.device)
 
-        # 当前Q值
         current_q_values = self.policy_net(batch_data).gather(1, actions.unsqueeze(1)).squeeze()
 
-        # DDQN核心：解耦动作选择和Q值评估
         with torch.no_grad():
-            # 策略网络选动作
             next_q_policy = self.policy_net(next_batch_data)
             best_actions = next_q_policy.argmax(1)
 
-            # 目标网络评估Q值
             next_q_target = self.target_net(next_batch_data)
             next_q_values = next_q_target.gather(1, best_actions.unsqueeze(1)).squeeze()
 
-        # 目标Q值
         target_q_values = rewards + (self.gamma * next_q_values * ~dones)
 
-        # 计算损失
         loss = F.mse_loss(current_q_values, target_q_values)
         self.losses.append(loss.item())
 
-        # 反向传播
         self.optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
         self.optimizer.step()
 
-        # 更新探索率
         self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
 
-        # 更新目标网络
         self.train_step += 1
         if self.train_step % self.target_update == 0:
             self.target_net.load_state_dict(self.policy_net.state_dict())
 
     def save_model(self, filepath):
-        """保存模型"""
         try:
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
             torch.save({
@@ -191,7 +150,6 @@ class DDQNAgent:
             logger.error(f"Failed to save model: {e}")
 
     def load_model(self, filepath):
-        """加载模型"""
         try:
             checkpoint = torch.load(filepath, map_location=self.device)
             self.policy_net.load_state_dict(checkpoint['policy_net_state_dict'])
@@ -206,13 +164,10 @@ class DDQNAgent:
             logger.error(f"Failed to load model: {e}")
 
     def reset_losses(self):
-        """重置loss列表"""
         self.losses.clear()
 
 
 class GCN_DDQNEnv:
-    """适配GCN的环境：构建图结构数据"""
-
     def __init__(self, num_vehicles=EnvConfig.NUM_VEHICLES,
                  num_base_stations=EnvConfig.NUM_BASESTATIONS,
                  num_edge_servers=EnvConfig.NUM_EDGE_SERVERS):
@@ -222,18 +177,15 @@ class GCN_DDQNEnv:
 
         self.current_graph_data = None
 
-        # 初始化模拟器
         self.simulator = Simulator(
                                    calculate_reward_fn=self._calculate_reward)
         self.simulator.setup_scenario(num_vehicles, num_base_stations, num_edge_servers)
         self.metrics = self.simulator.metrics
         self.metrics_episodes = []
 
-        # 节点特征维度（车辆8维 + 基站4维 + 边缘6维 + 云端3维）
         self.node_feature_dim = 8
 
     def reset(self):
-        """重置环境并生成初始图数据"""
         self.metrics_episodes.append(copy.deepcopy(self.metrics))
 
         self.simulator = Simulator(
@@ -243,20 +195,10 @@ class GCN_DDQNEnv:
         self.current_graph_data = None
 
     def build_graph_data(self):
-        """
-        构建图结构数据：
-        - 节点：车辆 + 基站 + 边缘服务器 + 云端
-        - 边：车辆-基站（通信连接）、基站-边缘服务器（部署关系）
-        - 节点特征：设备状态特征（统一8维）
-        - 边特征：通信质量/连接强度
-        :return: PyTorch Geometric Data对象
-        """
         try:
-            # 1. 收集所有节点（统一8维特征）
             nodes = []
-            node_types = []  # 0:车辆, 1:基站, 2:边缘, 3:云端
+            node_types = []
 
-            # 车辆节点特征（8维）
             for vehicle in self.simulator.vehicles:
                 cpu_util = vehicle.cpu_usage / vehicle.cpu_capacity if vehicle.cpu_capacity > 0 else 0.0
                 mem_util = vehicle.memory_usage / vehicle.memory_capacity if vehicle.memory_capacity > 0 else 0.0
@@ -264,13 +206,12 @@ class GCN_DDQNEnv:
                 pos_y = vehicle.position[1] / 12.0
                 task_load = len(vehicle.tasks) / 10.0 if hasattr(vehicle, 'tasks') else 0.0
                 battery = vehicle.battery / 100.0 if hasattr(vehicle, 'battery') else 1.0
-                delay_sensitivity = 1.0  # 任务延迟敏感度
-                priority = 1.0  # 任务优先级
+                delay_sensitivity = 1.0
+                priority = 1.0
 
                 nodes.append([pos_x, pos_y, cpu_util, mem_util, task_load, battery, delay_sensitivity, priority])
                 node_types.append(0)
 
-            # 基站节点特征（8维，不足补0）
             for bs in self.simulator.base_stations:
                 bandwidth = bs.bandwidth / 5000.0
                 connected_vehicles = len(bs.connected_vehicles) / self.num_vehicles
@@ -279,7 +220,6 @@ class GCN_DDQNEnv:
                 nodes.append([pos_x, pos_y, bandwidth, connected_vehicles, 0, 0, 0, 0])
                 node_types.append(1)
 
-            # 边缘服务器节点特征（8维）
             for es in self.simulator.edge_servers:
                 cpu_util = es.cpu_usage / es.cpu_capacity if es.cpu_capacity > 0 else 0.0
                 mem_util = es.memory_usage / es.memory_capacity if es.memory_capacity > 0 else 0.0
@@ -290,7 +230,6 @@ class GCN_DDQNEnv:
                 nodes.append([pos_x, pos_y, cpu_util, mem_util, load, energy, 0, 0])
                 node_types.append(2)
 
-            # 云端节点特征（8维）
             cloud = self.simulator.cloud_server
             compute_cap = cloud.compute_capacity / 1000.0
             delay = cloud.communication_delay / 0.1
@@ -298,77 +237,62 @@ class GCN_DDQNEnv:
             nodes.append([0.5, 0.5, compute_cap, delay, energy, 0, 0, 0])
             node_types.append(3)
 
-            # 数据校验：确保有节点
             if len(nodes) == 0:
                 logger.warning("No nodes found in graph construction")
-                # 返回空的图数据
                 return Data(x=torch.FloatTensor([[0.0] * 8]),
                             edge_index=torch.LongTensor([[], []]),
                             edge_attr=torch.FloatTensor([]))
 
-            # 2. 构建边（邻接矩阵）
             edge_index = [[], []]
-            edge_attr = []  # 边特征：距离/连接强度
+            edge_attr = []
 
-            # 车辆-基站边（基于距离）
             vehicle_count = len(self.simulator.vehicles)
             bs_count = len(self.simulator.base_stations)
             es_count = len(self.simulator.edge_servers)
 
-            # 优化：预计算索引偏移
             bs_idx_offset = vehicle_count
             es_idx_offset = vehicle_count + bs_count
             cloud_idx = vehicle_count + bs_count + es_count
 
-            # 车辆-基站边构建（优化循环逻辑）
             for vehicle_idx, vehicle in enumerate(self.simulator.vehicles):
                 for bs_idx, bs in enumerate(self.simulator.base_stations):
                     distance = vehicle.calculate_distance(vehicle.position, bs.position)
-                    if distance < 3.0:  # 距离小于3则建立连接
-                        strength = max(0.1, 1.0 - (distance / 3.0))  # 确保最小连接强度
-                        # 正向边
+                    if distance < 3.0:
+                        strength = max(0.1, 1.0 - (distance / 3.0))
                         edge_index[0].append(vehicle_idx)
                         edge_index[1].append(bs_idx_offset + bs_idx)
                         edge_attr.append([strength])
-                        # 无向图：反向边
                         edge_index[0].append(bs_idx_offset + bs_idx)
                         edge_index[1].append(vehicle_idx)
                         edge_attr.append([strength])
 
-            # 基站-边缘服务器边构建
             for bs_idx, bs in enumerate(self.simulator.base_stations):
                 for es_idx, es in enumerate(self.simulator.edge_servers):
                     if es in bs.connected_edge_servers:
-                        # 正向边
                         edge_index[0].append(bs_idx_offset + bs_idx)
                         edge_index[1].append(es_idx_offset + es_idx)
-                        edge_attr.append([1.0])  # 固定连接强度
-                        # 无向图：反向边
+                        edge_attr.append([1.0])
                         edge_index[0].append(es_idx_offset + es_idx)
                         edge_index[1].append(bs_idx_offset + bs_idx)
                         edge_attr.append([1.0])
 
-            # 可选：添加边缘服务器到云端的连接
             for es_idx in range(es_count):
                 edge_index[0].append(es_idx_offset + es_idx)
                 edge_index[1].append(cloud_idx)
-                edge_attr.append([0.5])  # 中等连接强度
-                # 反向边
+                edge_attr.append([0.5])
                 edge_index[0].append(cloud_idx)
                 edge_index[1].append(es_idx_offset + es_idx)
                 edge_attr.append([0.5])
 
-            # 3. 转换为PyTorch张量并创建Data对象
             x = torch.FloatTensor(nodes)
             edge_index = torch.LongTensor(edge_index)
             edge_attr = torch.FloatTensor(edge_attr) if edge_attr else torch.FloatTensor([])
 
-            # 添加节点类型作为额外属性
             graph_data = Data(
                 x=x,
                 edge_index=edge_index,
                 edge_attr=edge_attr,
-                node_types=torch.LongTensor(node_types),  # 保存节点类型
+                node_types=torch.LongTensor(node_types),
                 num_vehicles=vehicle_count,
                 num_base_stations=bs_count,
                 num_edge_servers=es_count
@@ -378,7 +302,6 @@ class GCN_DDQNEnv:
 
         except Exception as e:
             logger.error(f"Error building graph data: {e}", exc_info=True)
-            # 返回默认空图避免训练中断
             return Data(
                 x=torch.FloatTensor([[0.0] * 8]),
                 edge_index=torch.LongTensor([[], []]),
@@ -386,7 +309,6 @@ class GCN_DDQNEnv:
             )
 
     def step(self, action):
-        """执行动作并返回新的图状态"""
         reward = self.simulator.run_step(action)
         next_graph_data = self.build_graph_data()
         self.current_graph_data = next_graph_data
@@ -395,7 +317,6 @@ class GCN_DDQNEnv:
         return next_graph_data, reward, done
 
     def _calculate_reward(self, success, rtt, delay_constraint, energy, task_priority=1):
-        """奖励函数（保持原有逻辑）"""
         task_priority = max(1, min(5, task_priority))
         if not success:
             return -5 * task_priority
@@ -410,8 +331,6 @@ class GCN_DDQNEnv:
 
 
 def train_gcn_ddqn(lr=4e-5, gamma=0.95, epsilon=1.0, epsilon_decay=0.9, episodes_num=EnvConfig.EPISODES):
-    """训练GCN+DDQN模型"""
-    # 固定随机种子
     random.seed(EnvConfig.RANDOM_SEED)
     np.random.seed(EnvConfig.RANDOM_SEED)
     torch.manual_seed(EnvConfig.RANDOM_SEED)
@@ -420,12 +339,10 @@ def train_gcn_ddqn(lr=4e-5, gamma=0.95, epsilon=1.0, epsilon_decay=0.9, episodes
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-    # 初始化环境
     env = GCN_DDQNEnv(num_vehicles=EnvConfig.NUM_VEHICLES,
                       num_base_stations=EnvConfig.NUM_BASESTATIONS,
                       num_edge_servers=EnvConfig.NUM_EDGE_SERVERS)
 
-    # 初始化智能体（节点特征8维，边特征1维，动作3维）
     agent = DDQNAgent(node_feature_dim=8,
                       edge_feature_dim=1,
                       action_dim=3,
@@ -434,7 +351,6 @@ def train_gcn_ddqn(lr=4e-5, gamma=0.95, epsilon=1.0, epsilon_decay=0.9, episodes
                       epsilon=epsilon,
                       epsilon_decay=epsilon_decay)
 
-    # 训练记录
     rewards_history = []
     losses_history = []
     logger.info(f"Start training GCN+DDQN with lr={lr}, gamma={gamma}, decay={epsilon_decay}")
@@ -456,9 +372,7 @@ def train_gcn_ddqn(lr=4e-5, gamma=0.95, epsilon=1.0, epsilon_decay=0.9, episodes
             if agent.losses:
                 episode_losses.append(agent.losses[-1])
 
-        # 保存每轮总奖励
         rewards_history.append(total_reward)
-        # 保存每轮总损失值
         losses_history.append(np.sum(episode_losses))
 
         env.reset()
