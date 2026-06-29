@@ -29,6 +29,7 @@ class EdgeServer:
             'memory': self.memory_capacity
         }
 
+        self.max_task_queue_size = 10
         self.task_queue = []
         self.processing_tasks = []
         self.completed_tasks = []
@@ -59,6 +60,9 @@ class EdgeServer:
 
             if completion_time > (task.deadline // 1):
                 task.status = TaskStatus.FAILED
+                return False
+
+            if len(self.task_queue) >= self.max_task_queue_size:
                 return False
 
             heapq.heappush(self.task_queue, (priority, completion_time, task, processing_time))

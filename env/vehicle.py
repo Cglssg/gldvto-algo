@@ -26,6 +26,7 @@ class Vehicle:
         self.cpu_capacity = 4
         self.memory_capacity = 4
 
+        self.max_task_queue_size = 10
         self.pending_tasks = []
         self.completed_tasks = []
         self.task_queue = []
@@ -70,6 +71,9 @@ class Vehicle:
 
         if completion_time > (task.deadline // 1):
             task.status = TaskStatus.FAILED
+            return False
+
+        if len(self.task_queue) >= self.max_task_queue_size:
             return False
 
         heapq.heappush(self.task_queue, (priority, completion_time, task, processing_time))

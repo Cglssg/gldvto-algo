@@ -145,14 +145,7 @@ class Simulator:
                 pending_tasks.append((vehicle, task))
                 task_count += 1
 
-        if action is None and params is not None:
-            if params['algorithm-name'] == 'SA-DDQN-DDPG':
-                for vehicle, task in pending_tasks:
-                    compute_location, target = self.offload_decision_fn(vehicle, task, self.edge_servers, self.base_stations, self.cloud_server)
-                    success, rtt, energy = self.perform_offloading(vehicle, task, compute_location, target)
-                    reward = self.calculate_reward_fn(success, rtt, task.delay_constraint, energy, task.priority)
-                    total_reward += reward
-        elif action is not None:
+        if action is not None:
             for vehicle, task in pending_tasks:
                 if action == 0:
                     compute_location = ComputeLocation.LOCAL
