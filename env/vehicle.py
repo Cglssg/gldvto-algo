@@ -177,7 +177,7 @@ class Vehicle:
         processing_time = self.estimate_local_processing_time(task)
         if processing_time == float('inf'):
             return float('inf')
-        energy = processing_time * self.computation_power * (1 / 1)
+        energy = processing_time * self.computation_power
         return energy
 
     def estimate_edge_processing_time(self, task: 'Task', edge_server: 'EdgeServer',
@@ -202,7 +202,7 @@ class Vehicle:
         nearest_bs = min(base_stations,
                          key=lambda bs: self.calculate_distance(self.position, bs.position))
         transmission_time = self.calculate_transmission_time(data_size, nearest_bs)
-        energy = transmission_time * self.communication_power * (data_size / 100)
+        energy = transmission_time * self.communication_power * data_size / 100
         return energy
 
     def calculate_distance(self, pos1: Tuple[float, float], pos2: Tuple[float, float]) -> float:
@@ -228,8 +228,7 @@ class Vehicle:
         if not self.pending_tasks and not self.completed_tasks:
             computation_energy = 0.0
         else:
-            computation_energy = self.resource_utilization * self.cpu_capacity * self.computation_power * (
-                    time_step / 3600)
+            computation_energy = self.resource_utilization * self.cpu_capacity * self.computation_power * time_step
         self.computation_energy += computation_energy
         self.energy_consumption += computation_energy
 

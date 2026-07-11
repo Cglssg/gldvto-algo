@@ -32,7 +32,7 @@ class CommunicationLink:
         interference = (1 - channel_quality) * random.uniform(0.001, 0.01)
         actual_time = base_time + self.latency + random.uniform(0, self.jitter) + interference
 
-        transmission_energy = self.power_consumption * (actual_time / 3600)
+        transmission_energy = self.power_consumption * (actual_time)
         self.energy_consumption += transmission_energy
 
         if random.random() < self.packet_loss_rate:
@@ -52,7 +52,7 @@ class CommunicationLink:
 
     def update_idle_energy(self, time_step: float):
         if self.status == LinkStatus.CONNECTED:
-            idle_energy = self.idle_power * (time_step / 3600)
+            idle_energy = self.idle_power * time_step
             self.energy_consumption += idle_energy
 
     def update_energy_consumption(self, time_step: float):

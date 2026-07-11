@@ -13,6 +13,7 @@ class CloudServer:
         self.communication_delay = 0.05
         self.energy_consumption = 0.0
         self.power_consumption = 5.0
+        self.power_communication = 1
         self.cloud_tasks = []
 
     def schedule_task(self, task: Task, current_time: float, transmission_delay: float = 0):
@@ -60,8 +61,8 @@ class CloudServer:
         return task.compute_demand / self.compute_capacity
 
     def estimate_task_energy(self, task: Task, processing_time: float,transmission_time: float = 0) -> float:
-        computation_energy = task.compute_demand * (processing_time / 1)
-        communication_energy =  1 * (transmission_time / 1)
+        computation_energy = task.compute_demand * processing_time
+        communication_energy = self.power_communication * transmission_time
         return computation_energy + communication_energy
 
     def train_model(self, data_batch: List[Dict]) -> Dict:
@@ -75,6 +76,6 @@ class CloudServer:
             self.energy_consumption += push_energy
 
     def update_idle_energy(self, time_step: float):
-        idle_energy = self.power_consumption * 0.1 * (time_step / 3600)
+        idle_energy = self.power_consumption * 0.1 * time_step
         self.energy_consumption += idle_energy
         return idle_energy

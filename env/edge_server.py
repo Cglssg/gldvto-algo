@@ -113,8 +113,8 @@ class EdgeServer:
         return base_time + load_penalty
 
     def estimate_task_energy(self, task: Task, processing_time: float,transmission_delay) -> float:
-        computation_energy = self.computation_power * (processing_time / 1)
-        communication_energy = self.communication_power * (transmission_delay / 1)
+        computation_energy = self.computation_power * processing_time
+        communication_energy = self.communication_power * transmission_delay
 
         return computation_energy + communication_energy
 
@@ -129,6 +129,6 @@ class EdgeServer:
         self.connected_vehicles_count = len([t for t in self.task_queue if t[2].status == TaskStatus.PROCESSING])
 
     def update_idle_energy(self, time_step: float):
-        idle_energy = self.idle_power * (time_step / 3600)
+        idle_energy = self.idle_power * time_step
         self.energy_consumption += idle_energy
         return idle_energy

@@ -13,6 +13,6 @@ for svg_file in svg_files:
     drawing = svg2rlg(svg_path)
     renderPDF.drawToFile(drawing, pdf_path)
 
-    print(f"已成功转换: {svg_file} -> {pdf_name}")
+    print(f"transfer success: {svg_file} -> {pdf_name}")
 
-print("所有文件转换完成！")
+print("finished")

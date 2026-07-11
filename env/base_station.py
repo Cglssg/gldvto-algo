@@ -103,8 +103,8 @@ class BaseStation:
         return snr_linear_clamped
 
     def update_energy_consumption(self, time_step: float, data_throughput: float = 0):
-        communication_energy = data_throughput * self.communication_power * (time_step / 3600)
-        base_energy = self.power_consumption * (time_step / 3600)
+        communication_energy = data_throughput * self.communication_power * time_step
+        base_energy = self.power_consumption * time_step
         time_step_energy = base_energy + communication_energy
         self.energy_consumption += time_step_energy
         return time_step_energy
