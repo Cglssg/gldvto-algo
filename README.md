@@ -46,12 +46,12 @@ GCN-D3QN, GCN-DDQN, GAT-LSTM-DDQN, GLDVTO
 python algorithm/run_gather.py
 ```
 
-| 参数                   | 作用                                                         |
-| ---------------------- | ------------------------------------------------------------ |
-| `--use-cache`          | Load the local plot cache directly and skip training.        |
+| parameter                   | function                                                                                             |
+| -------------------- |------------------------------------------------------------------------------------------------------|
+| `--use-cache`        | Load the local plot cache directly and skip training.                                                |
 | `--cache-path xxx.pkl` | Manually specify the path to the cache `.pkl` file instead of using the auto-generated default path. |
-| `--save-dir ./xxx`     | Change the output directory for generated images and cache files. |
-| `--no-save-cache`      | Do not export the `.pkl` cache file after training is completed. |
+| `--save-dir ./xxx`   | Change the output directory for generated images and cache files.                                    |
+| `--no-save-cache`    | Do not export the `.pkl` cache file after training is completed.                                     |
 
 This script sequentially executes all algorithms stored in the directory, automatically collects all simulation metrics, and generates comparative visualization curves. Toggle the `IS_BASE` parameter in `algorithm_gather_comparison/algo_config.py` to switch between baseline experiments and ablation experiments.
 
