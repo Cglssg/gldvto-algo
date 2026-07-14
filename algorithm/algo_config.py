@@ -7,7 +7,9 @@ class EnvConfig:
     TASK_GENERATION_PRO = 0.50
     EPISODES = 400
     IS_BASE = False
-    # RANDOM_SEED = 100     # example seed:[ 100, 178, 999]
+    RANDOM_SEED = 100     # example seed:[ 100, 178, 999, 1500, 7777]
     # RANDOM_SEED = 178
     # RANDOM_SEED = 999
+    # RANDOM_SEED = 1500
+    # RANDOM_SEED = 7777
     IS_SMOOTH_DATA = True
